@@ -164,9 +164,12 @@ def _prioritize_emails(emails: list[str], domain: str) -> list[str]:
 
 def hr_email_scraper(state: dict) -> dict:
     """
-    LANGGRAPH NODE: Find HR/careers emails for each company.
+    LANGGRAPH NODE: Find HR/careers emails for LinkedIn-qualified companies.
 
-    For each company, tries multiple strategies:
+    Only processes companies with source='linkedin'.
+    Non-LinkedIn companies are skipped entirely.
+
+    For each qualified company, tries:
     1. Scrape company website contact/careers pages
     2. Search for public email addresses
     3. Generate common email patterns as fallback
@@ -179,15 +182,28 @@ def hr_email_scraper(state: dict) -> dict:
     """
     companies = state["companies"]
     print(f"\n📧 HR EMAIL SCRAPER")
-    print(f"   Processing {len(companies)} companies...")
+    print(f"   Processing {len(companies)} LinkedIn-qualified companies...")
     print("=" * 50)
+
+    processed = 0
+    skipped = 0
 
     for i, company in enumerate(companies):
         domain = company.get("domain", "")
         company_name = company.get("company_name", "")
         website = company.get("website", "")
+        source = company.get("source", "")
+
+        # === SOURCE VALIDATION: LinkedIn only ===
+        if source != "linkedin":
+            print(f"   [{i+1}/{len(companies)}] {company_name} — ⛔ SKIPPED (not LinkedIn-sourced)")
+            company["emails"] = []
+            company["primary_email"] = ""
+            skipped += 1
+            continue
 
         print(f"   [{i+1}/{len(companies)}] {company_name} ({domain})...", end=" ")
+        processed += 1
 
         all_emails = set()
 
@@ -213,7 +229,7 @@ def hr_email_scraper(state: dict) -> dict:
                 time.sleep(random.uniform(0.3, 0.8))
 
         # Strategy 2: Web search for emails (every 5th company to save API quota)
-        if len(all_emails) == 0 and i % 5 == 0:
+        if len(all_emails) == 0 and processed % 5 == 0:
             searched = _search_for_emails(company_name, domain)
             all_emails.update(searched)
 
@@ -233,13 +249,17 @@ def hr_email_scraper(state: dict) -> dict:
         print(status)
 
         # Rate limiting
-        if i % 10 == 0 and i > 0:
+        if processed % 10 == 0 and processed > 0:
             time.sleep(random.uniform(1, 3))
 
     # Count stats
     with_emails = sum(1 for c in companies if c.get("primary_email"))
     print(f"\n   📊 EMAIL SCRAPING COMPLETE:")
-    print(f"      Companies with emails: {with_emails}/{len(companies)}")
+    print(f"      LinkedIn-qualified:   {processed}")
+    if skipped > 0:
+        print(f"      Skipped (non-LI):     {skipped}")
+    print(f"      Companies with emails: {with_emails}/{processed}")
 
     state["companies"] = companies
     return state
+
