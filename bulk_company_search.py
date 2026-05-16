@@ -4,8 +4,10 @@ BULK COMPANY SEARCH MODULE
 ============================================
 Searches the web for 100-300 companies hiring
 for the target job role using Tavily Search API.
-Generates diverse search queries to maximize
-company discovery across multiple sources.
+
+Now experience-aware: generates different search
+queries for freshers vs experienced candidates
+to find level-appropriate companies.
 """
 
 import time
@@ -14,65 +16,128 @@ from tavily import TavilyClient
 import config
 
 
-def _generate_search_queries(job_role: str, location: str) -> list[str]:
+# ============================================
+# EXPERIENCE-LEVEL SEARCH KEYWORDS
+# ============================================
+
+FRESHER_KEYWORDS = [
+    "internship", "entry level", "fresher", "trainee",
+    "junior", "associate", "graduate", "campus hiring",
+    "entry-level", "new graduate",
+]
+
+JUNIOR_KEYWORDS = [
+    "junior", "associate", "early career", "1-2 years",
+    "entry level", "analyst", "coordinator",
+]
+
+MID_KEYWORDS = [
+    "mid level", "mid-level", "3-5 years experience",
+    "specialist", "experienced", "professional",
+]
+
+SENIOR_KEYWORDS = [
+    "senior", "lead", "principal", "manager",
+    "head of", "director", "5+ years", "expert",
+]
+
+
+def _get_level_keywords(experience_level: str, years: int) -> list[str]:
+    """Return search keyword modifiers based on candidate experience level."""
+    if experience_level == "fresher":
+        return FRESHER_KEYWORDS
+    elif years <= 2:
+        return JUNIOR_KEYWORDS
+    elif years <= 5:
+        return MID_KEYWORDS
+    else:
+        return SENIOR_KEYWORDS
+
+
+def _generate_search_queries(
+    job_role: str,
+    location: str,
+    experience_level: str,
+    years_of_experience: int,
+    industry: str,
+) -> list[str]:
     """
-    Generate diverse search queries to find many companies.
-    Uses different angles to maximize unique company discovery.
+    Generate diverse, experience-aware search queries.
+    Freshers get internship/entry-level queries.
+    Experienced candidates get seniority-matched queries.
     """
     location_str = f" in {location}" if location else ""
-    location_str_alt = f" {location}" if location else ""
+    industry_str = f" {industry}" if industry else ""
+    level_keywords = _get_level_keywords(experience_level, years_of_experience)
 
-    queries = [
-        # Direct hiring searches
-        f"companies hiring {job_role}{location_str} 2025 2026",
-        f"{job_role} job openings{location_str} careers email",
+    queries = []
+
+    # --- Level-specific queries (highest priority) ---
+    for kw in level_keywords[:6]:
+        queries.append(f"{kw} {job_role} jobs{location_str} 2025 2026")
+        queries.append(f"companies hiring {kw} {job_role}{location_str}")
+
+    # --- Industry-filtered queries ---
+    if industry:
+        queries.extend([
+            f"{industry} companies hiring {job_role}{location_str}",
+            f"{job_role} jobs {industry} sector{location_str}",
+            f"top {industry} companies {job_role} openings{location_str}",
+            f"{industry} {job_role} careers{location_str}",
+        ])
+
+    # --- General company discovery ---
+    queries.extend([
+        f"companies hiring {job_role}{location_str} careers email",
         f"top companies recruiting {job_role}{location_str}",
-        f"{job_role} positions available{location_str}",
-
-        # Careers page focused
-        f"{job_role} careers page apply now{location_str}",
-        f"site:careers hiring {job_role}{location_str_alt}",
         f"{job_role} open positions apply{location_str}",
-
-        # LinkedIn & job board style
-        f"{job_role} hiring now{location_str} company list",
         f"best companies for {job_role}{location_str}",
-        f"{job_role} employer{location_str} job listing",
-
-        # Industry specific
         f"startups hiring {job_role}{location_str}",
-        f"tech companies {job_role} jobs{location_str}",
         f"enterprise companies hiring {job_role}{location_str}",
-        f"fortune 500 {job_role} positions{location_str}",
-
-        # HR / recruiting focused
-        f"{job_role} recruiter contact{location_str}",
-        f"HR department hiring {job_role}{location_str}",
-        f"talent acquisition {job_role}{location_str}",
-
-        # Domain specific
-        f"{job_role} remote jobs companies hiring",
         f"mid-size companies hiring {job_role}{location_str}",
-        f"{job_role} job fair companies{location_str}",
-
-        # Additional variety
         f"who is hiring {job_role}{location_str} this month",
-        f"new {job_role} positions{location_str} companies",
-        f"{job_role} team openings{location_str}",
         f"growing companies {job_role} roles{location_str}",
-
-        # Job board aggregation
         f"{job_role} jobs{location_str} company names list",
         f"top employers {job_role}{location_str} 2025",
-        f"{job_role} opportunities{location_str} apply",
         f"companies looking for {job_role}{location_str}",
-        f"{job_role} vacancies{location_str} employer",
         f"hiring {job_role} professionals{location_str}",
-    ]
+        f"{job_role} vacancies{location_str} employer",
+        f"new {job_role} positions{location_str} companies",
+    ])
 
-    # Shuffle to vary the search pattern
-    random.shuffle(queries)
-    return queries
+    # --- Fresher-specific extras ---
+    if experience_level == "fresher":
+        queries.extend([
+            f"campus hiring {job_role}{location_str}",
+            f"fresher {job_role} walk in{location_str}",
+            f"graduate {job_role} program{location_str}",
+            f"{job_role} internship companies{location_str}",
+            f"companies offering {job_role} training{location_str}",
+        ])
+
+    # --- Experienced-specific extras ---
+    if experience_level == "experienced" and years_of_experience >= 3:
+        queries.extend([
+            f"{job_role} team lead opportunities{location_str}",
+            f"experienced {job_role} hiring{location_str}",
+            f"{job_role} specialist roles{location_str}",
+        ])
+
+    # Industry + level combo queries
+    if industry:
+        for kw in level_keywords[:3]:
+            queries.append(f"{industry} {kw} {job_role}{location_str}")
+
+    # Deduplicate and shuffle
+    seen = set()
+    unique = []
+    for q in queries:
+        q_lower = q.lower()
+        if q_lower not in seen:
+            seen.add(q_lower)
+            unique.append(q)
+    random.shuffle(unique)
+    return unique
 
 
 def _extract_companies_from_results(results: list[dict]) -> list[dict]:
@@ -187,30 +252,38 @@ def bulk_company_search(state: dict) -> dict:
     """
     LANGGRAPH NODE: Search for 100-300 companies hiring for the target role.
 
-    Uses Tavily Search API with multiple diverse queries to discover
-    as many unique companies as possible in a single execution.
+    Now experience-aware — freshers get internship/entry-level results,
+    experienced candidates get seniority-matched companies.
 
     Args:
-        state: LangGraph state containing 'job_role' and 'location'
+        state: LangGraph state containing candidate profile fields
 
     Returns:
         Updated state with 'companies' list
     """
     job_role = state["job_role"]
     location = state.get("location", "")
+    experience_level = state.get("experience_level", "fresher")
+    years_of_experience = state.get("years_of_experience", 0)
+    industry = state.get("industry", "")
+    seniority = state.get("seniority", "")
     target_count = config.TARGET_COMPANY_COUNT
 
     print(f"\n🔍 BULK COMPANY SEARCH")
     print(f"   Role: {job_role}")
+    print(f"   Level: {seniority}")
     print(f"   Location: {location or 'Any'}")
+    print(f"   Industry: {industry or 'Any'}")
     print(f"   Target: {target_count} companies")
     print("=" * 50)
 
     # Initialize Tavily client
     client = TavilyClient(api_key=config.TAVILY_API_KEY)
 
-    # Generate search queries
-    queries = _generate_search_queries(job_role, location)
+    # Generate experience-aware search queries
+    queries = _generate_search_queries(
+        job_role, location, experience_level, years_of_experience, industry
+    )
     all_companies = []
     seen_domains = set()
 

@@ -2,9 +2,10 @@
 ============================================
 PERSONALIZED EMAIL WRITER MODULE
 ============================================
-Uses Mistral AI to generate unique, personalized
-outreach emails for each company based on
-research data, job role, and user profile.
+Uses Mistral AI to generate realistic, professional
+job application emails. Each email uses the candidate's
+actual experience level, real skills, and years of
+experience — no placeholders, no fake praise.
 """
 
 import time
@@ -19,9 +20,106 @@ def _create_writer_llm():
     return ChatMistralAI(
         model=config.MISTRAL_MODEL,
         mistral_api_key=config.MISTRAL_API_KEY,
-        temperature=config.MISTRAL_TEMPERATURE,
+        temperature=0.6,
         max_tokens=config.MISTRAL_MAX_TOKENS,
     )
+
+
+def _build_candidate_summary(
+    experience_level: str,
+    years_of_experience: int,
+    skills: list[str],
+    job_role: str,
+) -> str:
+    """
+    Build a plain-English candidate summary from the profile data.
+    This gets injected directly into the email prompt so the LLM
+    uses REAL data instead of making up placeholders.
+    """
+    skills_str = ", ".join(skills) if skills else "relevant technical skills"
+
+    if experience_level == "fresher":
+        return (
+            f"a recent graduate seeking entry-level {job_role} opportunities. "
+            f"Core skills include {skills_str}."
+        )
+    elif years_of_experience <= 2:
+        return (
+            f"a professional with {years_of_experience} year{'s' if years_of_experience > 1 else ''} "
+            f"of experience in {job_role} roles. "
+            f"Key skills include {skills_str}."
+        )
+    elif years_of_experience <= 5:
+        return (
+            f"a professional with {years_of_experience} years of experience "
+            f"in {job_role} and related domains. "
+            f"Areas of expertise include {skills_str}."
+        )
+    else:
+        return (
+            f"a seasoned professional with {years_of_experience} years of experience "
+            f"in {job_role} and related functions. "
+            f"Specializations include {skills_str}."
+        )
+
+
+def _build_system_prompt() -> str:
+    """
+    The core system prompt that enforces realistic, human-sounding emails.
+    This is the single most important piece of prompt engineering in the app.
+    """
+    return """You are writing a real job application email on behalf of a candidate.
+Your output must read like a genuine email a real person would send to a company's HR department.
+
+STRICT RULES — FOLLOW EVERY ONE:
+
+FORMAT:
+- Output EXACTLY in this format, nothing else:
+  SUBJECT: <subject line>
+  BODY:
+  <email body>
+
+TONE:
+- Professional, formal, and respectful
+- Write like a real human candidate, not a marketing bot
+- Short sentences, clear language
+- No filler, no fluff
+
+ABSOLUTELY FORBIDDEN — never include any of these:
+- Square brackets like [Name], [X years], [skills], [Company Mission]
+- The word "admire" or "inspired" about the company
+- "I came across your company" or "I stumbled upon"
+- "Quick call next week?" or any aggressive call to action
+- "I would love to" (overused AI phrase)
+- Fake flattery about company mission, values, or culture
+- Buzzwords: "synergy", "leverage", "passionate", "thrilled", "excited to"
+- Exclamation marks
+- Placeholder text of any kind
+- The phrase "I believe my skills align"
+- The phrase "drive meaningful impact"
+
+MUST INCLUDE:
+- "Dear Hiring Team," as the greeting (always)
+- The candidate's actual experience level and years (provided to you)
+- The candidate's actual skills (provided to you)
+- A mention that a resume is attached
+- "Thank you for your time and consideration." near the end
+- "Best regards" as the sign-off (no name after it)
+
+STRUCTURE (4-5 sentences max for the body):
+1. State interest in the role at the company (one sentence)
+2. State experience level and years with 1-2 actual skills (one sentence)
+3. One sentence on what you can contribute (keep it simple and realistic)
+4. Mention resume is attached
+5. Thank them
+
+SUBJECT LINE:
+- Keep it simple and factual
+- Good: "Application for Data Analyst Position"
+- Good: "Data Analyst | Resume Attached"
+- Bad: "Excited to Join Your Amazing Team!"
+
+LENGTH: Maximum 100 words for the body. Shorter is better."""
 
 
 def _generate_email(
@@ -29,41 +127,35 @@ def _generate_email(
     company_name: str,
     job_role: str,
     research: str,
-    sender_email: str,
+    candidate_summary: str,
+    experience_level: str,
 ) -> dict:
     """
-    Generate a personalized outreach email for a specific company.
+    Generate a realistic outreach email for a specific company.
+
+    Args:
+        llm: Mistral AI instance
+        company_name: Name of the target company
+        job_role: Target position
+        research: Brief company research summary
+        candidate_summary: Pre-built candidate description with real data
+        experience_level: "fresher" or "experienced"
 
     Returns:
         dict with 'subject' and 'body' keys
     """
     try:
         messages = [
-            SystemMessage(content=(
-                "You are an expert job application email writer. Write a professional, "
-                "concise, and personalized cold outreach email for a job application. "
-                "\n\nRULES:\n"
-                "1. Keep it SHORT - maximum 150 words for the body\n"
-                "2. Start with a specific reference to the company (use the research provided)\n"
-                "3. Clearly state the target role\n"
-                "4. Highlight 2-3 relevant value propositions\n"
-                "5. Mention that a resume is attached\n"
-                "6. End with a clear call to action\n"
-                "7. Be professional but warm, not robotic\n"
-                "8. AVOID spam trigger words: 'free', 'guaranteed', 'act now', 'limited time'\n"
-                "9. Do NOT use excessive exclamation marks\n"
-                "10. Make each email feel genuinely personalized\n"
-                "\nOutput EXACTLY in this format:\n"
-                "SUBJECT: [your subject line here]\n"
-                "BODY:\n[your email body here]"
-            )),
+            SystemMessage(content=_build_system_prompt()),
             HumanMessage(content=(
-                f"Company: {company_name}\n"
-                f"Target Role: {job_role}\n"
-                f"Company Research: {research}\n"
-                f"Sender Email: {sender_email}\n\n"
-                f"Write a personalized job application outreach email for this company. "
-                f"Remember to mention that a resume is attached."
+                f"Write a job application email with these EXACT details:\n\n"
+                f"Company name: {company_name}\n"
+                f"Position: {job_role}\n"
+                f"Candidate: {candidate_summary}\n"
+                f"Company context: {research}\n\n"
+                f"Write the email now. Use the candidate details AS-IS — "
+                f"do not add brackets, do not add placeholders, do not invent skills "
+                f"or experience the candidate did not provide."
             )),
         ]
 
@@ -81,69 +173,92 @@ def _generate_email(
 
             # Extract subject
             subject = subject_part.replace("SUBJECT:", "").strip()
-            # Clean up any extra newlines
             subject = subject.split("\n")[0].strip()
         else:
             # Fallback parsing
-            lines = content.split("\n")
-            subject = f"Application for {job_role} Position - {company_name}"
+            subject = f"Application for {job_role} Position"
             body = content
 
         # Clean up the body
         body = body.strip()
-        if not body:
-            body = (
-                f"Dear Hiring Team,\n\n"
-                f"I am writing to express my interest in the {job_role} position "
-                f"at {company_name}. I believe my skills and experience align well "
-                f"with your team's needs.\n\n"
-                f"I have attached my resume for your review. I would welcome the "
-                f"opportunity to discuss how I can contribute to {company_name}.\n\n"
-                f"Thank you for your time and consideration.\n\n"
-                f"Best regards"
-            )
 
-        if not subject:
-            subject = f"Application for {job_role} Position - {company_name}"
+        # Post-processing: catch any remaining bracket placeholders
+        if "[" in body and "]" in body:
+            body = _generate_fallback_body(company_name, job_role, candidate_summary, experience_level)
+
+        if not body:
+            body = _generate_fallback_body(company_name, job_role, candidate_summary, experience_level)
+
+        if not subject or "[" in subject:
+            subject = f"Application for {job_role} Position"
 
         return {"subject": subject, "body": body}
 
     except Exception as e:
-        # Fallback email
         return {
-            "subject": f"Application for {job_role} Position - {company_name}",
-            "body": (
-                f"Dear Hiring Team,\n\n"
-                f"I am writing to express my strong interest in the {job_role} "
-                f"position at {company_name}. Based on my research, I am confident "
-                f"that my skills would be a great fit for your team.\n\n"
-                f"I have attached my resume for your review. I would appreciate "
-                f"the opportunity to discuss how I can contribute to {company_name}'s "
-                f"continued success.\n\n"
-                f"Thank you for your time and consideration.\n\n"
-                f"Best regards"
-            ),
+            "subject": f"Application for {job_role} Position",
+            "body": _generate_fallback_body(company_name, job_role, candidate_summary, experience_level),
         }
+
+
+def _generate_fallback_body(
+    company_name: str,
+    job_role: str,
+    candidate_summary: str,
+    experience_level: str,
+) -> str:
+    """
+    Generate a clean fallback email body using the candidate's real data.
+    No AI needed — just a solid, professional template with actual details.
+    """
+    if experience_level == "fresher":
+        return (
+            f"Dear Hiring Team,\n\n"
+            f"I am writing to express my interest in {job_role} opportunities "
+            f"at {company_name}. I am {candidate_summary}\n\n"
+            f"I have attached my resume for your review and would appreciate "
+            f"the opportunity to be considered for any suitable openings.\n\n"
+            f"Thank you for your time and consideration.\n\n"
+            f"Best regards"
+        )
+    else:
+        return (
+            f"Dear Hiring Team,\n\n"
+            f"I am writing to inquire about {job_role} opportunities "
+            f"at {company_name}. I am {candidate_summary}\n\n"
+            f"I have attached my resume for your review and would welcome "
+            f"the chance to discuss how my experience may be relevant to your team.\n\n"
+            f"Thank you for your time and consideration.\n\n"
+            f"Best regards"
+        )
 
 
 def personalized_email_writer(state: dict) -> dict:
     """
-    LANGGRAPH NODE: Generate personalized emails for every company.
+    LANGGRAPH NODE: Generate realistic, professional emails for every company.
 
-    Uses Mistral AI to create unique, company-specific outreach emails
-    based on the research data collected in the previous step.
+    Uses the candidate's actual profile data (experience, skills, years)
+    to write emails that sound human and genuine — not AI-generated templates.
 
     Args:
-        state: LangGraph state with researched 'companies' list
+        state: LangGraph state with researched companies + candidate profile
 
     Returns:
         Updated state with 'email_subject' and 'email_body' per company
     """
     companies = state["companies"]
     job_role = state["job_role"]
-    sender_email = config.GMAIL_EMAIL
+    experience_level = state.get("experience_level", "fresher")
+    years_of_experience = state.get("years_of_experience", 0)
+    skills = state.get("skills", [])
+
+    # Build candidate summary ONCE — reused for every email
+    candidate_summary = _build_candidate_summary(
+        experience_level, years_of_experience, skills, job_role
+    )
 
     print(f"\n✍️  PERSONALIZED EMAIL WRITER")
+    print(f"   Candidate: {candidate_summary}")
     print(f"   Generating emails for {len(companies)} companies with Mistral AI...")
     print("=" * 50)
 
@@ -157,18 +272,29 @@ def personalized_email_writer(state: dict) -> dict:
 
         print(f"   [{i+1}/{len(companies)}] Writing email for {company_name}...", end=" ")
 
-        email_data = _generate_email(llm, company_name, job_role, research, sender_email)
+        email_data = _generate_email(
+            llm, company_name, job_role, research,
+            candidate_summary, experience_level
+        )
 
         company["email_subject"] = email_data["subject"]
         company["email_body"] = email_data["body"]
 
-        # Check if it's a real generated email or fallback
-        if "I am writing to express" not in email_data["body"][:50]:
+        # Check quality — no brackets should remain
+        has_brackets = "[" in email_data["body"]
+        has_forbidden = any(w in email_data["body"].lower() for w in ["admire", "inspired", "thrilled"])
+
+        if not has_brackets and not has_forbidden:
             generated += 1
             print("✅")
         else:
+            # Replace with clean fallback
+            company["email_body"] = _generate_fallback_body(
+                company_name, job_role, candidate_summary, experience_level
+            )
+            company["email_subject"] = f"Application for {job_role} Position"
             fallback_count += 1
-            print("📝 (template)")
+            print("📝 (cleaned)")
 
         # Rate limiting for Mistral API
         if (i + 1) % 5 == 0:
@@ -177,8 +303,8 @@ def personalized_email_writer(state: dict) -> dict:
             time.sleep(random.uniform(0.5, 1.0))
 
     print(f"\n   📊 EMAIL GENERATION COMPLETE:")
-    print(f"      AI-personalized: {generated}")
-    print(f"      Template fallback: {fallback_count}")
+    print(f"      AI-generated (clean): {generated}")
+    print(f"      Fallback / cleaned:   {fallback_count}")
 
     state["companies"] = companies
     state["emails_generated"] = len(companies)
