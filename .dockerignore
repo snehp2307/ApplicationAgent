@@ -1,0 +1,52 @@
+# ============================================
+# Docker Ignore - Bulk AI Job Outreach Bot
+# ============================================
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment secrets (injected via env_file, not baked into image)
+.env
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Docker files (no need to copy themselves into the image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Output logs from previous runs (volume-mounted at runtime)
+output/
+
+# Resume folder (volume-mounted at runtime)
+resume/
+
+# Docs
+README.md
+*.md
+
+# Misc temp files
+*.log
+*.tmp
+*.bak

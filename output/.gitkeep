@@ -1,0 +1,8 @@
+# This directory holds runtime output files:
+#   - sent_log.csv
+#   - failed_log.csv
+#   - companies_found.csv
+#   - activity_log.txt
+#
+# These files are generated automatically when the bot runs.
+# They are excluded from git via .gitignore.

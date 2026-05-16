@@ -1,0 +1,59 @@
+# ============================================
+# Bulk AI Job Outreach Bot — .gitignore
+# ============================================
+
+# --- Secrets (NEVER commit these) ---
+.env
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# --- Virtual environments ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Output logs (generated at runtime) ---
+output/*.csv
+output/*.txt
+output/*.log
+
+# --- Resume files (personal data) ---
+resume/*.pdf
+resume/*.doc
+resume/*.docx
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+
+# --- Docker ---
+# Keep Dockerfile and docker-compose.yml tracked
+# but ignore runtime artifacts
+*.log
+
+# --- Misc ---
+*.tmp
+*.bak
+*.orig
+.cache/

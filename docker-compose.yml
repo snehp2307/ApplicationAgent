@@ -1,0 +1,50 @@
+# ============================================
+# BULK AI JOB OUTREACH BOT - Docker Compose
+# ============================================
+#
+# HOW TO USE:
+#   1. Create your .env file (copy from .env.example)
+#   2. Put your resume PDF in the ./resume folder
+#   3. Set RESUME_PATH=/app/resume/your_resume.pdf in .env
+#   4. Run:  docker-compose up --build
+#
+# COMMANDS:
+#   Build & Run:        docker-compose up --build
+#   Detached mode:      docker-compose up --build -d
+#   Stop:               docker-compose down
+#   Rebuild from scratch: docker-compose build --no-cache
+#   View logs:          docker-compose logs -f ai_job_bot
+# ============================================
+
+services:
+  ai_job_bot:
+    # --- Build from current directory ---
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # --- Container name ---
+    container_name: bulk_outreach_bot
+
+    # --- Environment variables from .env file ---
+    env_file:
+      - .env
+
+    # --- Interactive terminal support ---
+    # Required for input() prompts (job role, location, confirmation)
+    stdin_open: true    # docker run -i
+    tty: true           # docker run -t
+
+    # --- Volume mounts ---
+    # Maps host folders to container folders so data persists
+    # after the container stops.
+    volumes:
+      # Resume folder: put your PDF here on the host
+      - ./resume:/app/resume
+
+      # Output logs: sent_log.csv, failed_log.csv, etc.
+      - ./output:/app/output
+
+    # --- Restart policy ---
+    # "no" = don't auto-restart (this is a one-shot CLI tool)
+    restart: "no"
