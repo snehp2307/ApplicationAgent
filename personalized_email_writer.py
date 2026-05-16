@@ -4,8 +4,8 @@ PERSONALIZED EMAIL WRITER MODULE
 ============================================
 Uses Mistral AI to generate realistic, professional
 job application emails. Each email uses the candidate's
-actual experience level, real skills, and years of
-experience — no placeholders, no fake praise.
+RESUME-EXTRACTED profile — real skills, real education,
+real experience — no placeholders, no fake praise.
 """
 
 import time
@@ -25,16 +25,15 @@ def _create_writer_llm():
     )
 
 
-def _build_candidate_summary(
+def _build_candidate_summary_fallback(
     experience_level: str,
     years_of_experience: int,
     skills: list[str],
     job_role: str,
 ) -> str:
     """
-    Build a plain-English candidate summary from the profile data.
-    This gets injected directly into the email prompt so the LLM
-    uses REAL data instead of making up placeholders.
+    Fallback candidate summary when resume analysis is unavailable.
+    Uses only the basic user input fields.
     """
     skills_str = ", ".join(skills) if skills else "relevant technical skills"
 
@@ -237,8 +236,8 @@ def personalized_email_writer(state: dict) -> dict:
     """
     LANGGRAPH NODE: Generate realistic, professional emails for every company.
 
-    Uses the candidate's actual profile data (experience, skills, years)
-    to write emails that sound human and genuine — not AI-generated templates.
+    Uses the RESUME-DERIVED candidate summary as the source of truth.
+    Falls back to basic user-input summary if resume was not parsed.
 
     Args:
         state: LangGraph state with researched companies + candidate profile
@@ -252,13 +251,17 @@ def personalized_email_writer(state: dict) -> dict:
     years_of_experience = state.get("years_of_experience", 0)
     skills = state.get("skills", [])
 
-    # Build candidate summary ONCE — reused for every email
-    candidate_summary = _build_candidate_summary(
-        experience_level, years_of_experience, skills, job_role
-    )
+    # Use resume-derived summary (built in main.py from actual resume).
+    # Falls back to basic summary if resume analysis wasn't available.
+    candidate_summary = state.get("candidate_summary", "")
+    if not candidate_summary:
+        candidate_summary = _build_candidate_summary_fallback(
+            experience_level, years_of_experience, skills, job_role
+        )
 
     print(f"\n✍️  PERSONALIZED EMAIL WRITER")
-    print(f"   Candidate: {candidate_summary}")
+    print(f"   Source: {'Resume-analyzed profile' if state.get('resume_profile') else 'User input'}")
+    print(f"   Candidate: {candidate_summary[:120]}...")
     print(f"   Generating emails for {len(companies)} companies with Mistral AI...")
     print("=" * 50)
 

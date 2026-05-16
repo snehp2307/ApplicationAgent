@@ -34,12 +34,16 @@ class OutreachState(TypedDict, total=False):
     job_role: str
     location: str
 
-    # Candidate profile
+    # Candidate profile (from user input + resume)
     experience_level: str           # "fresher" or "experienced"
     years_of_experience: int        # 0 for fresher, 1+ for experienced
     skills: list[str]               # e.g. ["Python", "SQL", "Excel"]
     industry: str                   # preferred industry or ""
     seniority: str                  # display label e.g. "Fresher / Entry-Level"
+
+    # Resume-derived data
+    resume_profile: dict[str, Any]  # full parsed profile from resume
+    candidate_summary: str          # pre-built summary for email generation
 
     # Pipeline data
     companies: list[dict[str, Any]]
