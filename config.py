@@ -76,6 +76,11 @@ FULL_LOG_FILE = os.path.join(OUTPUT_DIR, "activity_log.txt")
 # Number of search queries to run per batch
 SEARCHES_PER_BATCH = 10
 
+# LinkedIn-first search settings
+LINKEDIN_RESULTS_PER_QUERY = int(os.getenv("LINKEDIN_RESULTS_PER_QUERY", "20"))
+LINKEDIN_MIN_MATCH_SCORE = int(os.getenv("LINKEDIN_MIN_MATCH_SCORE", "20"))
+LINKEDIN_FIRST = os.getenv("LINKEDIN_FIRST", "true").lower() == "true"
+
 # Common email patterns to try for companies
 EMAIL_PATTERNS = [
     "careers@{domain}",

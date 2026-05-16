@@ -273,10 +273,17 @@ def personalized_email_writer(state: dict) -> dict:
         company_name = company.get("company_name", "Unknown")
         research = company.get("research", "")
 
-        print(f"   [{i+1}/{len(companies)}] Writing email for {company_name}...", end=" ")
+        # Use LinkedIn job title if available for more targeted emails
+        linkedin_title = company.get("linkedin_job_title", "")
+        effective_role = linkedin_title if linkedin_title else job_role
+
+        print(f"   [{i+1}/{len(companies)}] Writing email for {company_name}", end="")
+        if linkedin_title:
+            print(f" ({linkedin_title})", end="")
+        print("...", end=" ")
 
         email_data = _generate_email(
-            llm, company_name, job_role, research,
+            llm, company_name, effective_role, research,
             candidate_summary, experience_level
         )
 
@@ -293,9 +300,9 @@ def personalized_email_writer(state: dict) -> dict:
         else:
             # Replace with clean fallback
             company["email_body"] = _generate_fallback_body(
-                company_name, job_role, candidate_summary, experience_level
+                company_name, effective_role, candidate_summary, experience_level
             )
-            company["email_subject"] = f"Application for {job_role} Position"
+            company["email_subject"] = f"Application for {effective_role} Position"
             fallback_count += 1
             print("📝 (cleaned)")
 

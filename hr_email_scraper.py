@@ -2,12 +2,14 @@
 ============================================
 HR EMAIL SCRAPER MODULE
 ============================================
-Attempts to find HR / careers / recruiting
-email addresses for each discovered company.
-Uses multiple strategies:
-1. Common email pattern generation
-2. Website scraping for contact pages
-3. Tavily search for public emails
+Finds HR / careers / recruiting email addresses
+for each company discovered via LinkedIn-first search.
+
+Companies arrive with resolved domains from the
+bulk search module. This scraper uses:
+  1. Website scraping for contact/careers pages
+  2. Tavily search for public email addresses
+  3. Common email pattern generation (fallback)
 """
 
 import re
